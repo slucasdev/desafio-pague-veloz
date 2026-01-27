@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SL.DesafioPagueVeloz.Domain.Entities;
+using SL.DesafioPagueVeloz.Domain.Enums;
 
 namespace SL.DesafioPagueVeloz.Infrastructure.Persistence.Configurations
 {
@@ -29,11 +30,17 @@ namespace SL.DesafioPagueVeloz.Infrastructure.Persistence.Configurations
                 documento.Property(d => d.Numero)
                     .HasColumnName("Documento")
                     .IsRequired()
-                    .HasMaxLength(14);
+                    .HasMaxLength(14)
+                    .HasColumnType("varchar(14)");
 
                 documento.Property(d => d.Tipo)
                     .HasColumnName("TipoDocumento")
-                    .IsRequired();
+                    .IsRequired()
+                    .HasConversion<int>();
+
+                documento.HasIndex(d => d.Numero)
+                    .HasDatabaseName("IX_Clientes_Documento")
+                    .IsUnique();
             });
 
             builder.Property(c => c.Ativo)
@@ -54,10 +61,6 @@ namespace SL.DesafioPagueVeloz.Infrastructure.Persistence.Configurations
             builder.HasIndex(c => c.Email)
                 .IsUnique()
                 .HasDatabaseName("IX_Clientes_Email");
-
-            builder.HasIndex("Documento_Numero")
-                .HasDatabaseName("IX_Clientes_Documento")
-                .IsUnique();
 
             builder.HasIndex(c => c.Ativo)
                 .HasDatabaseName("IX_Clientes_Ativo");

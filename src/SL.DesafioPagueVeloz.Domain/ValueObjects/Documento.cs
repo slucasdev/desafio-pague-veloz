@@ -5,8 +5,10 @@ namespace SL.DesafioPagueVeloz.Domain.ValueObjects
 {
     public sealed record Documento
     {
-        public string Numero { get; }
-        public TipoDocumento Tipo { get; }
+        public string Numero { get; private init; } = string.Empty;
+        public TipoDocumento Tipo { get; private init; }
+
+        private Documento() { }
 
         private Documento(string numero, TipoDocumento tipo)
         {
