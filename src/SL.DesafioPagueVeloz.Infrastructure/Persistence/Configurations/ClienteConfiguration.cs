@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SL.DesafioPagueVeloz.Domain.Entities;
-using SL.DesafioPagueVeloz.Domain.Enums;
 
 namespace SL.DesafioPagueVeloz.Infrastructure.Persistence.Configurations
 {

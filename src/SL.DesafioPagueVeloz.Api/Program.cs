@@ -53,7 +53,7 @@ if (app.Environment.IsDevelopment())
     {
         options
             .WithTitle("Desafio PagueVeloz API")
-            .WithTheme(ScalarTheme.Mars)
+            .WithTheme(ScalarTheme.DeepSpace)
             .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
     });
 }
