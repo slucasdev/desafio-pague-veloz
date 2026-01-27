@@ -5,9 +5,9 @@ namespace SL.DesafioPagueVeloz.Domain.Entities
 {
     public class Cliente : EntityBase
     {
-        public string Nome { get; private set; }
-        public Documento Documento { get; private set; }
-        public string Email { get; private set; }
+        public string Nome { get; private set; } = string.Empty;
+        public Documento Documento { get; private set; } = null!;
+        public string Email { get; private set; } = string.Empty;
         public bool Ativo { get; private set; }
 
         private readonly List<Conta> _contas = new();

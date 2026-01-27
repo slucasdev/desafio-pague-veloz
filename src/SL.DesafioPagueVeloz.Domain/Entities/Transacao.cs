@@ -9,7 +9,7 @@ namespace SL.DesafioPagueVeloz.Domain.Entities
         public Conta Conta { get; private set; } = null!;
         public TipoOperacao Tipo { get; private set; }
         public decimal Valor { get; private set; }
-        public string Descricao { get; private set; }
+        public string Descricao { get; private set; } = string.Empty;
         public StatusTransacao Status { get; private set; }
         public Guid IdempotencyKey { get; private set; }
         public Guid? TransacaoOrigemId { get; private set; }

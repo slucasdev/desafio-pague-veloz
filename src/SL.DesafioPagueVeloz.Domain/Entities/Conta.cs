@@ -10,7 +10,7 @@ namespace SL.DesafioPagueVeloz.Domain.Entities
     {
         public Guid ClienteId { get; private set; }
         public Cliente Cliente { get; private set; } = null!;
-        public string Numero { get; private set; }
+        public string Numero { get; private set; } = string.Empty;
         public decimal SaldoDisponivel { get; private set; }
         public decimal SaldoReservado { get; private set; }
         public decimal LimiteCredito { get; private set; }
