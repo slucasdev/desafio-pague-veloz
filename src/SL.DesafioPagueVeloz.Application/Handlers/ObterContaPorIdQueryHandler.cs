@@ -1,4 +1,5 @@
-﻿using MediatR;
+﻿using AutoMapper;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using SL.DesafioPagueVeloz.Application.DTOs;
 using SL.DesafioPagueVeloz.Application.Queries;
@@ -11,13 +12,16 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<ObterContaPorIdQueryHandler> _logger;
+        private readonly IMapper _mapper;
 
         public ObterContaPorIdQueryHandler(
             IUnitOfWork unitOfWork,
-            ILogger<ObterContaPorIdQueryHandler> logger)
+            ILogger<ObterContaPorIdQueryHandler> logger,
+            IMapper mapper)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
+            _mapper = mapper;
         }
 
         public async Task<OperationResult<ContaDTO>> Handle(
@@ -33,35 +37,17 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                 if (conta == null)
                 {
                     _logger.LogWarning("Conta não encontrada: {ContaId}", request.ContaId);
-                    return OperationResult<ContaDTO>.FailureResult(
-                        "Conta não encontrada",
-                        "ContaId inválido");
+                    return OperationResult<ContaDTO>.FailureResult("Conta não encontrada", "ContaId inválido");
                 }
-
-                var contaDTO = new ContaDTO
-                {
-                    Id = conta.Id,
-                    ClienteId = conta.ClienteId,
-                    Numero = conta.Numero,
-                    SaldoDisponivel = conta.SaldoDisponivel,
-                    SaldoReservado = conta.SaldoReservado,
-                    LimiteCredito = conta.LimiteCredito,
-                    SaldoTotal = conta.SaldoTotal,
-                    Status = conta.Status.ToString(),
-                    CriadoEm = conta.CriadoEm,
-                    AtualizadoEm = conta.AtualizadoEm
-                };
 
                 _logger.LogInformation("Conta encontrada: {ContaId}", request.ContaId);
 
-                return OperationResult<ContaDTO>.SuccessResult(contaDTO, "Conta encontrada com sucesso");
+                return OperationResult<ContaDTO>.SuccessResult(_mapper.Map<ContaDTO>(conta), "Conta encontrada com sucesso");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao buscar conta: {ContaId}", request.ContaId);
-                return OperationResult<ContaDTO>.FailureResult(
-                    "Erro ao buscar conta",
-                    ex.Message);
+                return OperationResult<ContaDTO>.FailureResult("Erro ao buscar conta", ex.Message);
             }
         }
     }

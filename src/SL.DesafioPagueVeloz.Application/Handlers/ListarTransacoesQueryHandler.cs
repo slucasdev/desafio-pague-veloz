@@ -1,4 +1,5 @@
-﻿using MediatR;
+﻿using AutoMapper;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using SL.DesafioPagueVeloz.Application.DTOs;
 using SL.DesafioPagueVeloz.Application.Queries;
@@ -11,13 +12,16 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<ListarTransacoesQueryHandler> _logger;
+        private readonly IMapper _mapper;
 
         public ListarTransacoesQueryHandler(
             IUnitOfWork unitOfWork,
-            ILogger<ListarTransacoesQueryHandler> logger)
+            ILogger<ListarTransacoesQueryHandler> logger,
+            IMapper mapper)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
+            _mapper = mapper;
         }
 
         public async Task<OperationResult<List<TransacaoDTO>>> Handle(
@@ -33,39 +37,21 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                 if (conta == null)
                 {
                     _logger.LogWarning("Conta não encontrada: {ContaId}", request.ContaId);
-                    return OperationResult<List<TransacaoDTO>>.FailureResult(
-                        "Conta não encontrada",
-                        "ContaId inválido");
+                    return OperationResult<List<TransacaoDTO>>.FailureResult("Conta não encontrada", "ContaId inválido");
                 }
 
                 var transacoes = await _unitOfWork.Transacoes.ObterPorContaIdAsync(request.ContaId, cancellationToken);
 
-                var transacoesDTO = transacoes.Select(t => new TransacaoDTO
-                {
-                    Id = t.Id,
-                    ContaId = t.ContaId,
-                    Tipo = t.Tipo.ToString(),
-                    Valor = t.Valor,
-                    Descricao = t.Descricao,
-                    Status = t.Status.ToString(),
-                    IdempotencyKey = t.IdempotencyKey,
-                    TransacaoOrigemId = t.TransacaoOrigemId,
-                    ProcessadoEm = t.ProcessadoEm,
-                    MotivoFalha = t.MotivoFalha,
-                    CriadoEm = t.CriadoEm
-                }).ToList();
+                var transacoesDTO = _mapper.Map<List<TransacaoDTO>>(transacoes);
 
-                _logger.LogInformation("Transações listadas com sucesso - Conta: {ContaId}, Total: {Total}",
-                    request.ContaId, transacoesDTO.Count);
+                _logger.LogInformation("Transações listadas com sucesso - Conta: {ContaId}, Total: {Total}", request.ContaId, transacoesDTO.Count);
 
                 return OperationResult<List<TransacaoDTO>>.SuccessResult(transacoesDTO, "Transações listadas com sucesso");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao listar transações da conta: {ContaId}", request.ContaId);
-                return OperationResult<List<TransacaoDTO>>.FailureResult(
-                    "Erro ao listar transações",
-                    ex.Message);
+                return OperationResult<List<TransacaoDTO>>.FailureResult("Erro ao listar transações", ex.Message);
             }
         }
     }

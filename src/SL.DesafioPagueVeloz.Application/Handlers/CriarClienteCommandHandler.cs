@@ -1,4 +1,5 @@
-﻿using MediatR;
+﻿using AutoMapper;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using SL.DesafioPagueVeloz.Application.Commands;
 using SL.DesafioPagueVeloz.Application.DTOs;
@@ -12,13 +13,16 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<CriarClienteCommandHandler> _logger;
+        private readonly IMapper _mapper;
 
         public CriarClienteCommandHandler(
             IUnitOfWork unitOfWork,
-            ILogger<CriarClienteCommandHandler> logger)
+            ILogger<CriarClienteCommandHandler> logger,
+            IMapper mapper)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
+            _mapper = mapper;
         }
 
         public async Task<OperationResult<ClienteDTO>> Handle(
@@ -29,19 +33,14 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
             {
                 _logger.LogInformation("Iniciando criação de cliente: {Nome}", request.Nome);
 
-                // Verificar se documento já existe
-                var documentoExiste = await _unitOfWork.Clientes
-                    .ExisteDocumentoAsync(request.Documento, cancellationToken);
+                var documentoExiste = await _unitOfWork.Clientes.ExisteDocumentoAsync(request.Documento, cancellationToken);
 
                 if (documentoExiste)
                 {
                     _logger.LogWarning("Tentativa de criar cliente com documento duplicado: {Documento}", request.Documento);
-                    return OperationResult<ClienteDTO>.FailureResult(
-                        "Cliente já cadastrado com este documento",
-                        "Documento duplicado");
+                    return OperationResult<ClienteDTO>.FailureResult("Cliente já cadastrado com este documento", "Documento duplicado");
                 }
 
-                // Criar cliente
                 var cliente = Cliente.Criar(request.Nome, request.Documento, request.Email);
 
                 await _unitOfWork.Clientes.AdicionarAsync(cliente, cancellationToken);
@@ -49,27 +48,12 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
 
                 _logger.LogInformation("Cliente criado com sucesso: {ClienteId}", cliente.Id);
 
-                // Mapear para DTO
-                var clienteDTO = new ClienteDTO
-                {
-                    Id = cliente.Id,
-                    Nome = cliente.Nome,
-                    Documento = cliente.Documento.Numero,
-                    TipoDocumento = cliente.Documento.Tipo.ToString(),
-                    Email = cliente.Email,
-                    Ativo = cliente.Ativo,
-                    CriadoEm = cliente.CriadoEm,
-                    AtualizadoEm = cliente.AtualizadoEm
-                };
-
-                return OperationResult<ClienteDTO>.SuccessResult(clienteDTO, "Cliente criado com sucesso");
+                return OperationResult<ClienteDTO>.SuccessResult(_mapper.Map<ClienteDTO>(cliente), "Cliente criado com sucesso");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao criar cliente: {Nome}", request.Nome);
-                return OperationResult<ClienteDTO>.FailureResult(
-                    "Erro ao criar cliente",
-                    ex.Message);
+                return OperationResult<ClienteDTO>.FailureResult("Erro ao criar cliente", ex.Message);
             }
         }
     }

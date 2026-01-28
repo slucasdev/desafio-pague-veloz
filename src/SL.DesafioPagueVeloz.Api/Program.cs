@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
+using SL.DesafioPagueVeloz.Api.Middleware;
 using SL.DesafioPagueVeloz.Application.Behaviors;
 using SL.DesafioPagueVeloz.Application.Interfaces;
 using SL.DesafioPagueVeloz.Domain.Interfaces.Repository;
@@ -14,7 +15,17 @@ using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Exception Handler
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
+// Controllers
 builder.Services.AddControllers();
+
+// Automapper
+builder.Services.AddAutoMapper(typeof(SL.DesafioPagueVeloz.Application.Mappings.MappingProfile));
+
+// Scalar
 builder.Services.AddOpenApi();
 
 // Database Context
@@ -75,6 +86,8 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -86,16 +99,8 @@ if (app.Environment.IsDevelopment())
             .WithTheme(ScalarTheme.DeepSpace)
             .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
     });
-}
 
-app.UseHttpsRedirection();
-app.UseCors("AllowAll");
-app.UseAuthorization();
-app.MapControllers();
-
-// Apply migrations at startup
-if (app.Environment.IsDevelopment())
-{
+    // Apply migrations at startup
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
@@ -109,5 +114,10 @@ if (app.Environment.IsDevelopment())
         app.Logger.LogError(ex, "Erro ao aplicar migrations");
     }
 }
+
+app.UseHttpsRedirection();
+app.UseCors("AllowAll");
+app.UseAuthorization();
+app.MapControllers();
 
 app.Run();

@@ -1,4 +1,5 @@
-﻿using MediatR;
+﻿using AutoMapper;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using SL.DesafioPagueVeloz.Application.DTOs;
 using SL.DesafioPagueVeloz.Application.Queries;
@@ -11,13 +12,16 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<ObterClientePorIdQueryHandler> _logger;
+        private readonly IMapper _mapper;
 
         public ObterClientePorIdQueryHandler(
             IUnitOfWork unitOfWork,
-            ILogger<ObterClientePorIdQueryHandler> logger)
+            ILogger<ObterClientePorIdQueryHandler> logger,
+            IMapper mapper)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
+            _mapper = mapper;
         }
 
         public async Task<OperationResult<ClienteDTO>> Handle(
@@ -33,33 +37,17 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                 if (cliente == null)
                 {
                     _logger.LogWarning("Cliente não encontrado: {ClienteId}", request.ClienteId);
-                    return OperationResult<ClienteDTO>.FailureResult(
-                        "Cliente não encontrado",
-                        "ClienteId inválido");
+                    return OperationResult<ClienteDTO>.FailureResult("Cliente não encontrado", "ClienteId inválido");
                 }
-
-                var clienteDTO = new ClienteDTO
-                {
-                    Id = cliente.Id,
-                    Nome = cliente.Nome,
-                    Documento = cliente.Documento.Numero,
-                    TipoDocumento = cliente.Documento.Tipo.ToString(),
-                    Email = cliente.Email,
-                    Ativo = cliente.Ativo,
-                    CriadoEm = cliente.CriadoEm,
-                    AtualizadoEm = cliente.AtualizadoEm
-                };
 
                 _logger.LogInformation("Cliente encontrado: {ClienteId}", request.ClienteId);
 
-                return OperationResult<ClienteDTO>.SuccessResult(clienteDTO, "Cliente encontrado com sucesso");
+                return OperationResult<ClienteDTO>.SuccessResult(_mapper.Map<ClienteDTO>(cliente), "Cliente encontrado com sucesso");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao buscar cliente: {ClienteId}", request.ClienteId);
-                return OperationResult<ClienteDTO>.FailureResult(
-                    "Erro ao buscar cliente",
-                    ex.Message);
+                return OperationResult<ClienteDTO>.FailureResult("Erro ao buscar cliente", ex.Message);
             }
         }
     }

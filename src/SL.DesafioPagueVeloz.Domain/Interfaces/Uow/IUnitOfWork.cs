@@ -12,5 +12,6 @@ namespace SL.DesafioPagueVeloz.Domain.Interfaces.Uow
         Task<int> CommitAsync(CancellationToken cancellationToken = default);
         Task RollbackAsync(CancellationToken cancellationToken = default);
         Task BeginTransactionAsync(CancellationToken cancellationToken = default);
+        Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken = default);
     }
 }

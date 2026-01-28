@@ -1,4 +1,5 @@
-﻿using MediatR;
+﻿using AutoMapper;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using SL.DesafioPagueVeloz.Application.Commands;
 using SL.DesafioPagueVeloz.Application.DTOs;
@@ -12,13 +13,16 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<CriarContaCommandHandler> _logger;
+        private readonly IMapper _mapper;
 
         public CriarContaCommandHandler(
             IUnitOfWork unitOfWork,
-            ILogger<CriarContaCommandHandler> logger)
+            ILogger<CriarContaCommandHandler> logger,
+            IMapper mapper)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
+            _mapper = mapper;
         }
 
         public async Task<OperationResult<ContaDTO>> Handle(
@@ -27,34 +31,24 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
         {
             try
             {
-                _logger.LogInformation("Iniciando criação de conta: {Numero} para cliente: {ClienteId}",
-                    request.Numero, request.ClienteId);
+                _logger.LogInformation("Iniciando criação de conta: {Numero} para cliente: {ClienteId}", request.Numero, request.ClienteId);
 
-                // Verificar se cliente existe
-                var cliente = await _unitOfWork.Clientes
-                    .ObterPorIdAsync(request.ClienteId, cancellationToken);
+                var cliente = await _unitOfWork.Clientes.ObterPorIdAsync(request.ClienteId, cancellationToken);
 
                 if (cliente == null)
                 {
                     _logger.LogWarning("Cliente não encontrado: {ClienteId}", request.ClienteId);
-                    return OperationResult<ContaDTO>.FailureResult(
-                        "Cliente não encontrado",
-                        "ClienteId inválido");
+                    return OperationResult<ContaDTO>.FailureResult("Cliente não encontrado", "ClienteId inválido");
                 }
 
-                // Verificar se número da conta já existe
-                var numeroExiste = await _unitOfWork.Contas
-                    .ExisteNumeroAsync(request.Numero, cancellationToken);
+                var numeroExiste = await _unitOfWork.Contas.ExisteNumeroAsync(request.Numero, cancellationToken);
 
                 if (numeroExiste)
                 {
                     _logger.LogWarning("Tentativa de criar conta com número duplicado: {Numero}", request.Numero);
-                    return OperationResult<ContaDTO>.FailureResult(
-                        "Número de conta já existe",
-                        "Número duplicado");
+                    return OperationResult<ContaDTO>.FailureResult("Número de conta já existe", "Número duplicado");
                 }
 
-                // Criar conta
                 var conta = Conta.Criar(request.ClienteId, request.Numero, request.LimiteCredito);
 
                 await _unitOfWork.Contas.AdicionarAsync(conta, cancellationToken);
@@ -62,29 +56,12 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
 
                 _logger.LogInformation("Conta criada com sucesso: {ContaId}", conta.Id);
 
-                // Mapear para DTO
-                var contaDTO = new ContaDTO
-                {
-                    Id = conta.Id,
-                    ClienteId = conta.ClienteId,
-                    Numero = conta.Numero,
-                    SaldoDisponivel = conta.SaldoDisponivel,
-                    SaldoReservado = conta.SaldoReservado,
-                    LimiteCredito = conta.LimiteCredito,
-                    SaldoTotal = conta.SaldoTotal,
-                    Status = conta.Status.ToString(),
-                    CriadoEm = conta.CriadoEm,
-                    AtualizadoEm = conta.AtualizadoEm
-                };
-
-                return OperationResult<ContaDTO>.SuccessResult(contaDTO, "Conta criada com sucesso");
+                return OperationResult<ContaDTO>.SuccessResult(_mapper.Map<ContaDTO>(conta), "Conta criada com sucesso");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao criar conta: {Numero}", request.Numero);
-                return OperationResult<ContaDTO>.FailureResult(
-                    "Erro ao criar conta",
-                    ex.Message);
+                return OperationResult<ContaDTO>.FailureResult("Erro ao criar conta", ex.Message);
             }
         }
     }

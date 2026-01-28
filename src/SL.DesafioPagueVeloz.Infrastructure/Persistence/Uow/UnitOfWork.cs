@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore.Storage;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using SL.DesafioPagueVeloz.Domain.Interfaces.Repository;
 using SL.DesafioPagueVeloz.Domain.Interfaces.Uow;
 using SL.DesafioPagueVeloz.Infrastructure.Persistence.Context;
@@ -56,6 +57,30 @@ namespace SL.DesafioPagueVeloz.Infrastructure.Persistence.Uow
         public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
         {
             _transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        }
+
+        public async Task<T> ExecuteInTransactionAsync<T>(
+        Func<Task<T>> action,
+        CancellationToken cancellationToken = default)
+        {
+            var strategy = _context.Database.CreateExecutionStrategy();
+
+            return await strategy.ExecuteAsync(async () =>
+            {
+                await BeginTransactionAsync(cancellationToken);
+
+                try
+                {
+                    var result = await action();
+                    await CommitAsync(cancellationToken);
+                    return result;
+                }
+                catch
+                {
+                    await RollbackAsync(cancellationToken);
+                    throw;
+                }
+            });
         }
 
         public void Dispose()

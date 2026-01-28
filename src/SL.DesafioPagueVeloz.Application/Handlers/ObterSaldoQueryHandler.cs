@@ -1,4 +1,5 @@
-﻿using MediatR;
+﻿using AutoMapper;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using SL.DesafioPagueVeloz.Application.DTOs;
 using SL.DesafioPagueVeloz.Application.Queries;
@@ -11,13 +12,16 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<ObterSaldoQueryHandler> _logger;
+        private readonly IMapper _mapper;
 
         public ObterSaldoQueryHandler(
             IUnitOfWork unitOfWork,
-            ILogger<ObterSaldoQueryHandler> logger)
+            ILogger<ObterSaldoQueryHandler> logger,
+            IMapper mapper)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
+            _mapper = mapper;
         }
 
         public async Task<OperationResult<SaldoDTO>> Handle(
@@ -33,33 +37,20 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                 if (conta == null)
                 {
                     _logger.LogWarning("Conta não encontrada: {ContaId}", request.ContaId);
-                    return OperationResult<SaldoDTO>.FailureResult(
-                        "Conta não encontrada",
-                        "ContaId inválido");
+                    return OperationResult<SaldoDTO>.FailureResult("Conta não encontrada", "ContaId inválido");
                 }
 
-                var saldoDTO = new SaldoDTO
-                {
-                    ContaId = conta.Id,
-                    NumeroConta = conta.Numero,
-                    SaldoDisponivel = conta.SaldoDisponivel,
-                    SaldoReservado = conta.SaldoReservado,
-                    LimiteCredito = conta.LimiteCredito,
-                    SaldoTotal = conta.SaldoTotal,
-                    ConsultadoEm = DateTime.UtcNow
-                };
+                var saldoDTO = _mapper.Map<SaldoDTO>(conta);
+                saldoDTO.ConsultadoEm = DateTime.UtcNow;
 
-                _logger.LogInformation("Saldo consultado com sucesso - Conta: {ContaId}, Saldo: {Saldo}",
-                    conta.Id, conta.SaldoDisponivel);
+                _logger.LogInformation("Saldo consultado com sucesso - Conta: {ContaId}, Saldo: {Saldo}", conta.Id, conta.SaldoDisponivel);
 
                 return OperationResult<SaldoDTO>.SuccessResult(saldoDTO, "Saldo consultado com sucesso");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao consultar saldo da conta: {ContaId}", request.ContaId);
-                return OperationResult<SaldoDTO>.FailureResult(
-                    "Erro ao consultar saldo",
-                    ex.Message);
+                return OperationResult<SaldoDTO>.FailureResult("Erro ao consultar saldo", ex.Message);
             }
         }
     }

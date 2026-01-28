@@ -1,4 +1,5 @@
-﻿using MediatR;
+﻿using AutoMapper;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using SL.DesafioPagueVeloz.Application.Commands;
 using SL.DesafioPagueVeloz.Application.DTOs;
@@ -11,13 +12,16 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<CreditarContaCommandHandler> _logger;
+        private readonly IMapper _mapper;
 
         public CreditarContaCommandHandler(
             IUnitOfWork unitOfWork,
-            ILogger<CreditarContaCommandHandler> logger)
+            ILogger<CreditarContaCommandHandler> logger,
+            IMapper mapper)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
+            _mapper = mapper;
         }
 
         public async Task<OperationResult<TransacaoDTO>> Handle(
@@ -29,87 +33,46 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                 _logger.LogInformation("Iniciando crédito na conta: {ContaId}, Valor: {Valor}",
                     request.ContaId, request.Valor);
 
-                // Verificar idempotência
-                var transacaoExistente = await _unitOfWork.Transacoes
-                    .ObterPorIdempotencyKeyAsync(request.IdempotencyKey, cancellationToken);
+                var transacaoExistente = await _unitOfWork.Transacoes.ObterPorIdempotencyKeyAsync(request.IdempotencyKey, cancellationToken);
 
                 if (transacaoExistente != null)
                 {
                     _logger.LogInformation("Transação já processada (idempotência): {IdempotencyKey}", request.IdempotencyKey);
+                    return OperationResult<TransacaoDTO>.SuccessResult(_mapper.Map<TransacaoDTO>(transacaoExistente), "Transação já processada anteriormente");
+                }
 
-                    var transacaoDTO = new TransacaoDTO
+                return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+                {
+                    var conta = await _unitOfWork.Contas.ObterComLockAsync(request.ContaId, cancellationToken);
+
+                    if (conta == null)
                     {
-                        Id = transacaoExistente.Id,
-                        ContaId = transacaoExistente.ContaId,
-                        Tipo = transacaoExistente.Tipo.ToString(),
-                        Valor = transacaoExistente.Valor,
-                        Descricao = transacaoExistente.Descricao,
-                        Status = transacaoExistente.Status.ToString(),
-                        IdempotencyKey = transacaoExistente.IdempotencyKey,
-                        TransacaoOrigemId = transacaoExistente.TransacaoOrigemId,
-                        ProcessadoEm = transacaoExistente.ProcessadoEm,
-                        MotivoFalha = transacaoExistente.MotivoFalha,
-                        CriadoEm = transacaoExistente.CriadoEm
-                    };
+                        _logger.LogWarning("Conta não encontrada: {ContaId}", request.ContaId);
+                        return OperationResult<TransacaoDTO>.FailureResult("Conta não encontrada", "ContaId inválido");
+                    }
 
-                    return OperationResult<TransacaoDTO>.SuccessResult(transacaoDTO, "Transação já processada anteriormente");
-                }
+                    conta.Creditar(request.Valor, request.Descricao, request.IdempotencyKey);
 
-                // Iniciar transação
-                await _unitOfWork.BeginTransactionAsync(cancellationToken);
+                    _unitOfWork.Contas.Atualizar(conta);
+                    await _unitOfWork.CommitAsync(cancellationToken);
 
-                // Obter conta com lock pessimista
-                var conta = await _unitOfWork.Contas.ObterComLockAsync(request.ContaId, cancellationToken);
+                    _logger.LogInformation("Crédito realizado com sucesso na conta: {ContaId}, Novo saldo: {Saldo}",
+                        conta.Id, conta.SaldoDisponivel);
 
-                if (conta == null)
-                {
-                    await _unitOfWork.RollbackAsync(cancellationToken);
-                    _logger.LogWarning("Conta não encontrada: {ContaId}", request.ContaId);
-                    return OperationResult<TransacaoDTO>.FailureResult(
-                        "Conta não encontrada",
-                        "ContaId inválido");
-                }
+                    var transacao = conta.Transacoes.Last();
+                    transacao.MarcarComoProcessada();
 
-                // Executar operação de crédito
-                conta.Creditar(request.Valor, request.Descricao, request.IdempotencyKey);
+                    _unitOfWork.Transacoes.Atualizar(transacao);
+                    await _unitOfWork.CommitAsync(cancellationToken);
 
-                _unitOfWork.Contas.Atualizar(conta);
-                await _unitOfWork.CommitAsync(cancellationToken);
+                    return OperationResult<TransacaoDTO>.SuccessResult(_mapper.Map<TransacaoDTO>(transacao), "Crédito realizado com sucesso");
 
-                _logger.LogInformation("Crédito realizado com sucesso na conta: {ContaId}, Novo saldo: {Saldo}",
-                    conta.Id, conta.SaldoDisponivel);
-
-                // Obter a transação criada
-                var transacao = conta.Transacoes.Last();
-                transacao.MarcarComoProcessada();
-                _unitOfWork.Transacoes.Atualizar(transacao);
-                await _unitOfWork.CommitAsync(cancellationToken);
-
-                // Mapear para DTO
-                var resultado = new TransacaoDTO
-                {
-                    Id = transacao.Id,
-                    ContaId = transacao.ContaId,
-                    Tipo = transacao.Tipo.ToString(),
-                    Valor = transacao.Valor,
-                    Descricao = transacao.Descricao,
-                    Status = transacao.Status.ToString(),
-                    IdempotencyKey = transacao.IdempotencyKey,
-                    TransacaoOrigemId = transacao.TransacaoOrigemId,
-                    ProcessadoEm = transacao.ProcessadoEm,
-                    MotivoFalha = transacao.MotivoFalha,
-                    CriadoEm = transacao.CriadoEm
-                };
-
-                return OperationResult<TransacaoDTO>.SuccessResult(resultado, "Crédito realizado com sucesso");
+                }, cancellationToken);
             }
             catch (Exception ex)
             {
-                await _unitOfWork.RollbackAsync(cancellationToken);
                 _logger.LogError(ex, "Erro ao creditar conta: {ContaId}", request.ContaId);
-                return OperationResult<TransacaoDTO>.FailureResult(
-                    "Erro ao processar crédito",
-                    ex.Message);
+                return OperationResult<TransacaoDTO>.FailureResult("Erro ao processar crédito", ex.Message);
             }
         }
     }
