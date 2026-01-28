@@ -64,7 +64,7 @@ namespace SL.DesafioPagueVeloz.Infrastructure.Persistence.Context
             {
                 foreach (var domainEvent in entity.DomainEvents)
                 {
-                    var outboxMessage = new OutboxMessage(
+                    var outboxMessage = OutboxMessage.Criar(
                         domainEvent.TipoEvento,
                         JsonSerializer.Serialize(domainEvent, domainEvent.GetType(), JsonOptions)
                     );

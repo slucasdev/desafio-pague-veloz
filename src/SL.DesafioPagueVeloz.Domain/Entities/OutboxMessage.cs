@@ -14,12 +14,23 @@ namespace SL.DesafioPagueVeloz.Domain.Entities
 
         private OutboxMessage() { }
 
-        public OutboxMessage(string tipoEvento, string conteudoJson)
+        private OutboxMessage(string tipoEvento, string conteudoJson)
         {
             TipoEvento = tipoEvento;
             ConteudoJson = conteudoJson;
             Processado = false;
             TentativasProcessamento = 0;
+        }
+
+        public static OutboxMessage Criar(string tipoEvento, string conteudoJson)
+        {
+            if (string.IsNullOrWhiteSpace(tipoEvento))
+                throw new ArgumentException("Tipo do evento é obrigatório", nameof(tipoEvento));
+
+            if (string.IsNullOrWhiteSpace(conteudoJson))
+                throw new ArgumentException("Conteúdo JSON é obrigatório", nameof(conteudoJson));
+
+            return new OutboxMessage(tipoEvento, conteudoJson);
         }
 
         public void MarcarComoProcessado()

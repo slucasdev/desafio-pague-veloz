@@ -3,4 +3,8 @@
   <Project Path="src/SL.DesafioPagueVeloz.Application/SL.DesafioPagueVeloz.Application.csproj" Id="d67f15c8-0e80-40ac-8241-20e8d93e379e" />
   <Project Path="src/SL.DesafioPagueVeloz.Domain/SL.DesafioPagueVeloz.Domain.csproj" Id="ad8fcabf-573f-4d6e-9df8-e470351b4ef8" />
   <Project Path="src/SL.DesafioPagueVeloz.Infrastructure/SL.DesafioPagueVeloz.Infrastructure.csproj" Id="a1e61add-80aa-4de6-8fe4-1a98dbe31b45" />
+  <Project Path="tests/SL.DesafioPagueVeloz.Api.Tests/SL.DesafioPagueVeloz.Api.Tests.csproj" Id="64aa213a-87fa-45b7-a25c-d522614d35bd" />
+  <Project Path="tests/SL.DesafioPagueVeloz.Application.Tests/SL.DesafioPagueVeloz.Application.Tests.csproj" Id="baaa3ac4-9fe6-4016-a14f-ebff8ed95250" />
+  <Project Path="tests/SL.DesafioPagueVeloz.Domain.Tests/SL.DesafioPagueVeloz.Domain.Tests.csproj" Id="9a7bbbc4-e097-42bb-a6ea-e676cd3e0612" />
+  <Project Path="tests/SL.DesafioPagueVeloz.Infrastructure.Tests/SL.DesafioPagueVeloz.Infrastructure.Tests.csproj" Id="e00b4dce-758d-4490-8218-013d36807d97" />
 </Solution>

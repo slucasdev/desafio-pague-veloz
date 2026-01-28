@@ -1,4 +1,5 @@
 ﻿using SL.DesafioPagueVeloz.Domain.Common;
+using SL.DesafioPagueVeloz.Domain.Events.Cliente;
 using SL.DesafioPagueVeloz.Domain.ValueObjects;
 
 namespace SL.DesafioPagueVeloz.Domain.Entities
@@ -32,7 +33,11 @@ namespace SL.DesafioPagueVeloz.Domain.Entities
                 throw new ArgumentException("Email é obrigatório", nameof(email));
 
             var doc = Documento.Criar(documento);
-            return new Cliente(nome, doc, email);
+            var cliente = new Cliente(nome, doc, email);
+
+            cliente.AdicionarEvento(new ClienteCriadoEvent(cliente.Id, nome, email, doc.Numero));
+
+            return cliente;
         }
 
         public void AdicionarConta(Conta conta)
@@ -47,6 +52,9 @@ namespace SL.DesafioPagueVeloz.Domain.Entities
         public void Desativar()
         {
             Ativo = false;
+
+            AdicionarEvento(new ClienteDesativadoEvent(Id, "Cliente desativado manualmente"));
+
             AtualizarTimestamp();
         }
 

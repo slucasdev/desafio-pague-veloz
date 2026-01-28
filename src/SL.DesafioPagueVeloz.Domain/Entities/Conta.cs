@@ -164,8 +164,11 @@ namespace SL.DesafioPagueVeloz.Domain.Entities
             AtualizarTimestamp();
         }
 
-        public void Bloquear()
+        public void Bloquear(string motivo)
         {
+            if (string.IsNullOrWhiteSpace(motivo))
+                throw new ArgumentException("Motivo do bloqueio é obrigatório", nameof(motivo));
+
             var statusAnterior = Status;
             Status = StatusConta.Bloqueada;
 
