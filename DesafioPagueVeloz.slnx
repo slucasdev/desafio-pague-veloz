@@ -1,4 +1,11 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".dockerignore" />
+    <File Path=".gitignore" />
+    <File Path="docker-compose.yml" />
+    <File Path="Dockerfile" />
+    <File Path="README.md" />
+  </Folder>
   <Project Path="src/SL.DesafioPagueVeloz.Api/SL.DesafioPagueVeloz.Api.csproj" Id="6221d9f9-66a1-4725-b6ef-9cc2ecc1fa4c" />
   <Project Path="src/SL.DesafioPagueVeloz.Application/SL.DesafioPagueVeloz.Application.csproj" Id="d67f15c8-0e80-40ac-8241-20e8d93e379e" />
   <Project Path="src/SL.DesafioPagueVeloz.Domain/SL.DesafioPagueVeloz.Domain.csproj" Id="ad8fcabf-573f-4d6e-9df8-e470351b4ef8" />
