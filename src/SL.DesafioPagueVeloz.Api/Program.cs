@@ -1,4 +1,4 @@
-using FluentValidation;
+﻿using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using SL.DesafioPagueVeloz.Api.Middleware;
@@ -12,6 +12,7 @@ using SL.DesafioPagueVeloz.Infrastructure.Persistence.Context;
 using SL.DesafioPagueVeloz.Infrastructure.Persistence.Repositories;
 using SL.DesafioPagueVeloz.Infrastructure.Persistence.Uow;
 using System.Reflection;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -76,6 +77,74 @@ builder.Services.AddScoped<IDomainEventDispatcher, DomainEventPublisher>();
 // Background Services
 builder.Services.AddHostedService<OutboxProcessorService>();
 
+// Health Checks
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ApplicationDbContext>(
+        name: "database",
+        failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy,
+        tags: new[] { "db", "sql", "sqlserver" })
+    .AddCheck("self", () =>
+        Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy("API is running"),
+        tags: new[] { "api" });
+
+// Rate Limiting
+builder.Services.AddRateLimiter(options =>
+{
+    // 1. Política Global (todas as rotas)
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        // Identifica cliente por IP
+        var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetSlidingWindowLimiter(clientIp, _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 100,                              // 100 requests
+            Window = TimeSpan.FromMinutes(1),               // Por minuto
+            SegmentsPerWindow = 6,                          // Divide em 6 segmentos
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 10                                 // 10 requests na fila
+        });
+    });
+
+    // 2. Política Específica para Transações (mais restritiva)
+    options.AddPolicy("transacoes", context =>
+    {
+        var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 30,                               // Apenas 30 transações
+            Window = TimeSpan.FromMinutes(1),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 5
+        });
+    });
+
+    // 3. Resposta customizada quando exceder limite
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            await context.HttpContext.Response.WriteAsJsonAsync(new
+            {
+                error = "Too Many Requests",
+                message = $"Rate limit exceeded. Try again in {retryAfter.TotalSeconds} seconds.",
+                retryAfter = retryAfter.TotalSeconds
+            }, cancellationToken);
+        }
+        else
+        {
+            await context.HttpContext.Response.WriteAsJsonAsync(new
+            {
+                error = "Too Many Requests",
+                message = "Rate limit exceeded. Please wait before making more requests."
+            }, cancellationToken);
+        }
+    };
+});
+
 // CORS
 builder.Services.AddCors(options =>
 {
@@ -90,6 +159,11 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 app.UseExceptionHandler();
+app.UseHttpsRedirection();
+app.UseCors("AllowAll");
+// Rate Limiting
+app.UseRateLimiter();
+app.UseAuthorization();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -118,12 +192,41 @@ if (app.Environment.IsDevelopment())
     }
 }
 
-app.UseHttpsRedirection();
-app.UseCors("AllowAll");
-app.UseAuthorization();
 app.MapControllers();
+
+// Health Check
+app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("db")
+});
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("api")
+});
+app.MapHealthChecks("/health/details", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var response = new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                exception = e.Value.Exception?.Message,
+                duration = e.Value.Duration.TotalMilliseconds
+            }),
+            totalDuration = report.TotalDuration.TotalMilliseconds
+        };
+        await context.Response.WriteAsJsonAsync(response);
+    }
+});
 
 app.Run();
 
-// Adicionado partial class para permitir testes de integra��o (Recomenda��o oficial da Microsoft)
+// Adicionado partial class para permitir testes de integração (Recomendação oficial da Microsoft)
 public partial class Program { }

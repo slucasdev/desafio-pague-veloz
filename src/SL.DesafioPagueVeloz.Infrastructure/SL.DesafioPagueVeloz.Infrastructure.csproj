@@ -33,4 +33,8 @@
 		<ProjectReference Include="..\SL.DesafioPagueVeloz.Domain\SL.DesafioPagueVeloz.Domain.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Migrations\" />
+	</ItemGroup>
+
 </Project>

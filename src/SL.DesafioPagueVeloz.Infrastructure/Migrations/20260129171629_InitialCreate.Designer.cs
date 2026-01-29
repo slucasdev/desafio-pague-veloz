@@ -12,7 +12,7 @@ using SL.DesafioPagueVeloz.Infrastructure.Persistence.Context;
 namespace SL.DesafioPagueVeloz.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260127004218_InitialCreate")]
+    [Migration("20260129171629_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -242,7 +242,7 @@ namespace SL.DesafioPagueVeloz.Infrastructure.Migrations
                             b1.Property<string>("Numero")
                                 .IsRequired()
                                 .HasMaxLength(14)
-                                .HasColumnType("varchar(14)")
+                                .HasColumnType("nvarchar(14)")
                                 .HasColumnName("Documento");
 
                             b1.Property<int>("Tipo")

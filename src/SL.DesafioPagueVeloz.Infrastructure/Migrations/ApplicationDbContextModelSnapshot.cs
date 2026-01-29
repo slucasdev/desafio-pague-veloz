@@ -239,7 +239,7 @@ namespace SL.DesafioPagueVeloz.Infrastructure.Migrations
                             b1.Property<string>("Numero")
                                 .IsRequired()
                                 .HasMaxLength(14)
-                                .HasColumnType("varchar(14)")
+                                .HasColumnType("nvarchar(14)")
                                 .HasColumnName("Documento");
 
                             b1.Property<int>("Tipo")
