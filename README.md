@@ -1,4 +1,4 @@
-# 💰 Desafio PagueVeloz - Sistema de Transações Financeiras
+﻿# 💰 Desafio PagueVeloz - Sistema de Transações Financeiras
 
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge&logo=dotnet)](https://dotnet.microsoft.com/)
 [![C#](https://img.shields.io/badge/C%23-13.0-239120?style=for-the-badge&logo=c-sharp)](https://docs.microsoft.com/en-us/dotnet/csharp/)
