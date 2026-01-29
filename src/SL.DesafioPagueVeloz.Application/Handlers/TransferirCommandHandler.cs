@@ -40,14 +40,28 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                 {
                     _logger.LogInformation("Transação já processada (idempotência): {IdempotencyKey}", request.IdempotencyKey);
 
-                    var transacoesRelacionadas = await _unitOfWork.Transacoes.ObterPorContaIdAsync(request.ContaOrigemId, cancellationToken);
+                    // Buscar ambas as transações (débito e crédito)
+                    var result = new List<TransacaoDTO>();
 
-                    var transacoesDTO = transacoesRelacionadas
-                        .Where(t => t.IdempotencyKey == request.IdempotencyKey || t.TransacaoOrigemId == transacaoExistente.Id)
-                        .Select(t => _mapper.Map<TransacaoDTO>(t))
-                        .ToList();
+                    // Adicionar a transação existente (débito)
+                    result.Add(_mapper.Map<TransacaoDTO>(transacaoExistente));
 
-                    return OperationResult<List<TransacaoDTO>>.SuccessResult(transacoesDTO, "Transação já processada anteriormente");
+                    // Buscar transação de crédito correspondente na conta destino
+                    // Ela foi criada no mesmo momento, com o mesmo valor
+                    var transacoesDestino = await _unitOfWork.Transacoes.ObterPorContaIdAsync(request.ContaDestinoId, cancellationToken);
+                    var transacaoCredito = transacoesDestino
+                        .Where(t => t.Tipo == Domain.Enums.TipoOperacao.Credito
+                                 && t.Valor == request.Valor
+                                 && t.Descricao.Contains(request.Descricao ?? "Transferência"))
+                        .OrderByDescending(t => t.CriadoEm)
+                        .FirstOrDefault();
+
+                    if (transacaoCredito != null)
+                    {
+                        result.Add(_mapper.Map<TransacaoDTO>(transacaoCredito));
+                    }
+
+                    return OperationResult<List<TransacaoDTO>>.SuccessResult(result, "Transação já processada anteriormente");
                 }
 
                 return await _unitOfWork.ExecuteInTransactionAsync(async () =>
@@ -80,8 +94,18 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                     _logger.LogInformation("Transferência realizada com sucesso - Origem: {ContaOrigemId}, Destino: {ContaDestinoId}",
                         request.ContaOrigemId, request.ContaDestinoId);
 
-                    var transacaoDebito = contaOrigem.Transacoes.Last();
-                    var transacaoCredito = contaDestino.Transacoes.Last();
+                    var transacaoDebito = contaOrigem.Transacoes
+                        .FirstOrDefault(t => t.IdempotencyKey == idempotencyKeyDebito);
+
+                    var transacaoCredito = contaDestino.Transacoes
+                        .FirstOrDefault(t => t.IdempotencyKey == idempotencyKeyCredito);
+
+                    if (transacaoDebito == null || transacaoCredito == null)
+                    {
+                        _logger.LogError("Transações de transferência não encontradas. DebitoKey: {DebitoKey}, CreditoKey: {CreditoKey}, DebitoFound: {DebitoFound}, CreditoFound: {CreditoFound}",
+                            idempotencyKeyDebito, idempotencyKeyCredito, transacaoDebito != null, transacaoCredito != null);
+                        return OperationResult<List<TransacaoDTO>>.FailureResult("Erro ao processar transferência", "Transações não encontradas");
+                    }
 
                     transacaoDebito.MarcarComoProcessada();
                     transacaoCredito.MarcarComoProcessada();

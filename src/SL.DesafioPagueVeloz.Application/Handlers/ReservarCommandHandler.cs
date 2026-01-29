@@ -58,7 +58,14 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
 
                     _logger.LogInformation("Reserva realizada com sucesso na conta: {ContaId}, Saldo reservado: {SaldoReservado}", conta.Id, conta.SaldoReservado);
 
-                    var transacao = conta.Transacoes.Last();
+                    var transacao = conta.Transacoes.FirstOrDefault(t => t.IdempotencyKey == request.IdempotencyKey);
+
+                    if (transacao == null)
+                    {
+                        _logger.LogError("Transação de reserva não encontrada. IdempotencyKey: {IdempotencyKey}", request.IdempotencyKey);
+                        return OperationResult<TransacaoDTO>.FailureResult("Erro ao processar reserva", "Transação não encontrada");
+                    }
+
                     transacao.MarcarComoProcessada();
 
                     _unitOfWork.Transacoes.Atualizar(transacao);

@@ -20,8 +20,7 @@ namespace SL.DesafioPagueVeloz.Infrastructure.Persistence.Configurations
                 .HasMaxLength(255);
 
             builder.Property(o => o.ConteudoJson)
-                .IsRequired()
-                .HasColumnType("nvarchar(max)");
+                .IsRequired();
 
             builder.Property(o => o.Processado)
                 .IsRequired();

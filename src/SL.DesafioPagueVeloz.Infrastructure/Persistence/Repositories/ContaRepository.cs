@@ -27,7 +27,7 @@ namespace SL.DesafioPagueVeloz.Infrastructure.Persistence.Repositories
                 .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
         }
 
-        public async Task<Conta?> ObterComLockAsync(Guid id, CancellationToken cancellationToken = default)
+        public virtual async Task<Conta?> ObterComLockAsync(Guid id, CancellationToken cancellationToken = default)
         {
             // UPDLOCK + ROWLOCK: Lock pessimista para garantir exclusividade na operação
             // Isso previne condições de corrida em operações concorrentes na mesma conta

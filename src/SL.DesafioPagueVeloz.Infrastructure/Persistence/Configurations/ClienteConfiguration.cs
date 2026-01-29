@@ -29,8 +29,7 @@ namespace SL.DesafioPagueVeloz.Infrastructure.Persistence.Configurations
                 documento.Property(d => d.Numero)
                     .HasColumnName("Documento")
                     .IsRequired()
-                    .HasMaxLength(14)
-                    .HasColumnType("varchar(14)");
+                    .HasMaxLength(14);
 
                 documento.Property(d => d.Tipo)
                     .HasColumnName("TipoDocumento")

@@ -59,7 +59,14 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                     _logger.LogInformation("Crédito realizado com sucesso na conta: {ContaId}, Novo saldo: {Saldo}",
                         conta.Id, conta.SaldoDisponivel);
 
-                    var transacao = conta.Transacoes.Last();
+                    var transacao = conta.Transacoes.FirstOrDefault(t => t.IdempotencyKey == request.IdempotencyKey);
+
+                    if (transacao == null)
+                    {
+                        _logger.LogError("Transação de crédito não encontrada. IdempotencyKey: {IdempotencyKey}", request.IdempotencyKey);
+                        return OperationResult<TransacaoDTO>.FailureResult("Erro ao processar crédito", "Transação não encontrada");
+                    }
+
                     transacao.MarcarComoProcessada();
 
                     _unitOfWork.Transacoes.Atualizar(transacao);

@@ -29,19 +29,22 @@ builder.Services.AddAutoMapper(typeof(SL.DesafioPagueVeloz.Application.Mappings.
 builder.Services.AddOpenApi();
 
 // Database Context
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
-        sqlOptions =>
-        {
-            sqlOptions.EnableRetryOnFailure(
-                maxRetryCount: 5,
-                maxRetryDelay: TimeSpan.FromSeconds(30),
-                errorNumbersToAdd: null);
-            sqlOptions.CommandTimeout(60);
-            sqlOptions.MigrationsAssembly("SL.DesafioPagueVeloz.Infrastructure");
-        }
-    ));
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseSqlServer(
+            builder.Configuration.GetConnectionString("DefaultConnection"),
+            sqlOptions =>
+            {
+                sqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 5,
+                    maxRetryDelay: TimeSpan.FromSeconds(30),
+                    errorNumbersToAdd: null);
+                sqlOptions.CommandTimeout(60);
+                sqlOptions.MigrationsAssembly("SL.DesafioPagueVeloz.Infrastructure");
+            }
+        ));
+}
 
 // MediatR
 builder.Services.AddMediatR(cfg =>
@@ -121,3 +124,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Adicionado partial class para permitir testes de integração (Recomendação oficial da Microsoft)
+public partial class Program { }

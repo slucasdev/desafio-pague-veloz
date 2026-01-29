@@ -71,13 +71,20 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                     _logger.LogInformation("Estorno realizado com sucesso na conta: {ContaId}, Novo saldo: {SaldoDisponivel}",
                         conta.Id, conta.SaldoDisponivel);
 
-                    var transacao = conta.Transacoes.Last();
-                    transacao.MarcarComoProcessada();
+                    var transacaoEstorno = conta.Transacoes.FirstOrDefault(t => t.IdempotencyKey == request.IdempotencyKey);
 
-                    _unitOfWork.Transacoes.Atualizar(transacao);
+                    if (transacaoEstorno == null)
+                    {
+                        _logger.LogError("Transação de estorno não encontrada após criação. IdempotencyKey: {IdempotencyKey}", request.IdempotencyKey);
+                        return OperationResult<TransacaoDTO>.FailureResult("Erro ao processar estorno", "Transação de estorno não encontrada");
+                    }
+
+                    transacaoEstorno.MarcarComoProcessada();
+
+                    _unitOfWork.Transacoes.Atualizar(transacaoEstorno);
                     await _unitOfWork.CommitAsync(cancellationToken);
 
-                    return OperationResult<TransacaoDTO>.SuccessResult(_mapper.Map<TransacaoDTO>(transacao), "Estorno realizado com sucesso");
+                    return OperationResult<TransacaoDTO>.SuccessResult(_mapper.Map<TransacaoDTO>(transacaoEstorno), "Estorno realizado com sucesso");
 
                 }, cancellationToken);
             }

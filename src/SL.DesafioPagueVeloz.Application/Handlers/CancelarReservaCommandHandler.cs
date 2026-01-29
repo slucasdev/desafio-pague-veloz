@@ -68,7 +68,14 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                     _logger.LogInformation("Cancelamento de reserva realizado com sucesso na conta: {ContaId}, Saldo disponível: {SaldoDisponivel}",
                         conta.Id, conta.SaldoDisponivel);
 
-                    var transacao = conta.Transacoes.Last();
+                    var transacao = conta.Transacoes.FirstOrDefault(t => t.IdempotencyKey == request.IdempotencyKey);
+
+                    if (transacao == null)
+                    {
+                        _logger.LogError("Transação de cancelamento não encontrada. IdempotencyKey: {IdempotencyKey}", request.IdempotencyKey);
+                        return OperationResult<TransacaoDTO>.FailureResult("Erro ao processar cancelamento", "Transação não encontrada");
+                    }
+
                     transacao.MarcarComoProcessada();
 
                     _unitOfWork.Transacoes.Atualizar(transacao);
