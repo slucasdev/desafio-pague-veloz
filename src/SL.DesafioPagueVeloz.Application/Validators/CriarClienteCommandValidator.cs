@@ -21,8 +21,11 @@ namespace SL.DesafioPagueVeloz.Application.Validators
                 .MaximumLength(255).WithMessage("Email não pode ter mais de 255 caracteres");
         }
 
-        private bool BeValidDocumento(string documento)
+        private bool BeValidDocumento(string? documento)
         {
+            if (string.IsNullOrWhiteSpace(documento))
+                return false;
+
             var apenasNumeros = new string(documento.Where(char.IsDigit).ToArray());
             return apenasNumeros.Length == 11 || apenasNumeros.Length == 14;
         }
