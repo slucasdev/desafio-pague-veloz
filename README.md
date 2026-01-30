@@ -3,7 +3,7 @@
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge&logo=dotnet)](https://dotnet.microsoft.com/)
 [![C#](https://img.shields.io/badge/C%23-13.0-239120?style=for-the-badge&logo=c-sharp)](https://docs.microsoft.com/en-us/dotnet/csharp/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-144%20Passing-success?style=for-the-badge&logo=xunit)](https://xunit.net/)
+[![Tests](https://img.shields.io/badge/Tests-146%20Passing-success?style=for-the-badge&logo=xunit)](https://xunit.net/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
 > **Sistema bancário digital completo** desenvolvido com **Clean Architecture**, **CQRS**, **Domain-Driven Design** e padrões de alta disponibilidade. Implementa operações financeiras críticas com garantias de **idempotência**, **consistência transacional** e **controle de concorrência**.
@@ -226,11 +226,11 @@ Acesse: http://localhost:5000 (API) e http://localhost:5000/scalar/v1 (Swagger)
 
 ### **Cobertura de Testes:**
 
-    📊 Total: 144 testes ✅ (100% passing)
+    📊 Total: 146 testes ✅ (100% passing)
     ├── 🌐 Integration Tests (API)............ 18 testes
     ├── 🧩 Domain Tests (Entities)............ 74 testes
     ├── ✅ Application Tests (Validators)...... 28 testes
-    └── 🔧 Infrastructure Tests............... 24 testes
+    └── 🔧 Infrastructure Tests............... 26 testes
 
 ### **Executar Testes:**
 
@@ -368,7 +368,7 @@ Tratamento de erros funcional sem exceptions para fluxo de negócio, com melhor 
     │   ├── SL.DesafioPagueVeloz.Api.Tests/         # 18 integration tests
     │   ├── SL.DesafioPagueVeloz.Application.Tests/ # 28 validator tests
     │   ├── SL.DesafioPagueVeloz.Domain.Tests/      # 74 unit tests
-    │   └── SL.DesafioPagueVeloz.Infrastructure.Tests/ # 24 tests
+    │   └── SL.DesafioPagueVeloz.Infrastructure.Tests/ # 26 tests
     ├── Dockerfile
     ├── docker-compose.yml
     ├── .dockerignore
@@ -379,7 +379,7 @@ Tratamento de erros funcional sem exceptions para fluxo de negócio, com melhor 
 ## 🌟 Diferenciais do Projeto
 
 ### **Implementados:**
-- [x] **144 testes** (100% passing) - unit + integration + validation + infrastructure
+- [x] **146 testes** (100% passing) - unit + integration + validation + infrastructure
 - [x] **Clean Architecture** com separação clara de responsabilidades
 - [x] **CQRS** para segregação de leitura/escrita
 - [x] **Domain-Driven Design** com rich domain model
@@ -410,7 +410,7 @@ Tratamento de erros funcional sem exceptions para fluxo de negócio, com melhor 
 
 ## 📈 Métricas de Qualidade
 
-    📊 Testes:          144/144 ✅ (100% passing)
+    📊 Testes:          146/146 ✅ (100% passing)
     🎯 Cobertura:       > 85% (estimado)
     📦 Arquitetura:     Clean Architecture ✅
     🔒 Segurança:       Rate Limiting + Validations ✅

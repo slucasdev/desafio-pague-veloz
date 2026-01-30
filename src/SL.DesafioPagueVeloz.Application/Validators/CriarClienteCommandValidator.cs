@@ -21,6 +21,7 @@ namespace SL.DesafioPagueVeloz.Application.Validators
                 .MaximumLength(255).WithMessage("Email não pode ter mais de 255 caracteres");
         }
 
+        // TODO: @slucasdev - Implementar melhorias na validação de documento (CPF/CNPJ)
         private bool BeValidDocumento(string? documento)
         {
             if (string.IsNullOrWhiteSpace(documento))

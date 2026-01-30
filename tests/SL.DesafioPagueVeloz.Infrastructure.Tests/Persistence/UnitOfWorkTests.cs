@@ -47,7 +47,7 @@ namespace SL.DesafioPagueVeloz.Infrastructure.Tests.Persistence
         }
 
         [Fact]
-        public async Task ExecuteInTransactionAsync_DeveSalvarComSucesso()
+        public async Task BeginTransactionAsync_DeveGerenciarTransacaoComSucesso()
         {
             // Arrange
             var context = _fixture.CreateNewContext();
@@ -67,18 +67,75 @@ namespace SL.DesafioPagueVeloz.Infrastructure.Tests.Persistence
             var conta = Conta.Criar(Guid.NewGuid(), "00001-5", 1000);
 
             // Act
-            var resultado = await unitOfWork.ExecuteInTransactionAsync(async () =>
-            {
-                await unitOfWork.Contas.AdicionarAsync(conta);
-                await unitOfWork.CommitAsync();
-                return "Sucesso";
-            });
+            await unitOfWork.BeginTransactionAsync();
+            await unitOfWork.Contas.AdicionarAsync(conta);
+            await unitOfWork.CommitAsync();
 
             // Assert
-            resultado.Should().Be("Sucesso");
-
             var contaSalva = await unitOfWork.Contas.ObterPorIdAsync(conta.Id);
             contaSalva.Should().NotBeNull();
+            contaSalva!.Numero.Should().Be("00001-5");
+            contaSalva.LimiteCredito.Should().Be(1000);
+        }
+
+        [Fact]
+        public async Task RollbackAsync_DeveReverterAlteracoes()
+        {
+            // Arrange
+            var context = _fixture.CreateNewContext();
+
+            var clienteRepository = new ClienteRepository(context);
+            var contaRepository = new ContaRepository(context);
+            var transacaoRepository = new TransacaoRepository(context);
+            var outboxRepository = new OutboxMessageRepository(context);
+
+            var unitOfWork = new UnitOfWork(
+                context,
+                clienteRepository,
+                contaRepository,
+                transacaoRepository,
+                outboxRepository);
+
+            var conta = Conta.Criar(Guid.NewGuid(), "00002-3", 500);
+
+            // Act
+            await unitOfWork.BeginTransactionAsync();
+            await unitOfWork.Contas.AdicionarAsync(conta);
+            await unitOfWork.RollbackAsync();
+
+            // Assert
+            var contaSalva = await unitOfWork.Contas.ObterPorIdAsync(conta.Id);
+            contaSalva.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task CommitAsync_SemTransacao_DeveSalvarNormalmente()
+        {
+            // Arrange
+            var context = _fixture.CreateNewContext();
+
+            var clienteRepository = new ClienteRepository(context);
+            var contaRepository = new ContaRepository(context);
+            var transacaoRepository = new TransacaoRepository(context);
+            var outboxRepository = new OutboxMessageRepository(context);
+
+            var unitOfWork = new UnitOfWork(
+                context,
+                clienteRepository,
+                contaRepository,
+                transacaoRepository,
+                outboxRepository);
+
+            var cliente = Cliente.Criar("Maria Santos", "98765432100", "maria@email.com");
+            await unitOfWork.Clientes.AdicionarAsync(cliente);
+
+            // Act (sem BeginTransaction)
+            var result = await unitOfWork.CommitAsync();
+
+            // Assert
+            result.Should().BeGreaterThan(0);
+            var clienteSalvo = await unitOfWork.Clientes.ObterPorIdAsync(cliente.Id);
+            clienteSalvo.Should().NotBeNull();
         }
     }
 }

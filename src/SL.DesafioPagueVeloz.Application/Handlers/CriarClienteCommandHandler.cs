@@ -44,7 +44,6 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                 var cliente = Cliente.Criar(request.Nome, request.Documento, request.Email);
 
                 await _unitOfWork.Clientes.AdicionarAsync(cliente, cancellationToken);
-                await _unitOfWork.CommitAsync(cancellationToken);
 
                 _logger.LogInformation("Cliente criado com sucesso: {ClienteId}", cliente.Id);
 

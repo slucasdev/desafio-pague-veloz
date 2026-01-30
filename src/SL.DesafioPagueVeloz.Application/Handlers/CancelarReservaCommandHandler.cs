@@ -50,40 +50,34 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                     return OperationResult<TransacaoDTO>.FailureResult("Transação de reserva não encontrada", "TransacaoReservaId inválido");
                 }
 
-                return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+                var conta = await _unitOfWork.Contas.ObterComLockAsync(request.ContaId, cancellationToken);
+
+                if (conta == null)
                 {
-                    var conta = await _unitOfWork.Contas.ObterComLockAsync(request.ContaId, cancellationToken);
+                    _logger.LogWarning("Conta não encontrada: {ContaId}", request.ContaId);
+                    return OperationResult<TransacaoDTO>.FailureResult("Conta não encontrada", "ContaId inválido");
+                }
 
-                    if (conta == null)
-                    {
-                        _logger.LogWarning("Conta não encontrada: {ContaId}", request.ContaId);
-                        return OperationResult<TransacaoDTO>.FailureResult("Conta não encontrada", "ContaId inválido");
-                    }
+                conta.CancelarReserva(request.Valor, request.TransacaoReservaId, request.Descricao, request.IdempotencyKey);
 
-                    conta.CancelarReserva(request.Valor, request.TransacaoReservaId, request.Descricao, request.IdempotencyKey);
+                _unitOfWork.Contas.Atualizar(conta);
 
-                    _unitOfWork.Contas.Atualizar(conta);
-                    await _unitOfWork.CommitAsync(cancellationToken);
+                _logger.LogInformation("Cancelamento de reserva realizado com sucesso na conta: {ContaId}, Saldo disponível: {SaldoDisponivel}",
+                    conta.Id, conta.SaldoDisponivel);
 
-                    _logger.LogInformation("Cancelamento de reserva realizado com sucesso na conta: {ContaId}, Saldo disponível: {SaldoDisponivel}",
-                        conta.Id, conta.SaldoDisponivel);
+                var transacao = conta.Transacoes.FirstOrDefault(t => t.IdempotencyKey == request.IdempotencyKey);
 
-                    var transacao = conta.Transacoes.FirstOrDefault(t => t.IdempotencyKey == request.IdempotencyKey);
+                if (transacao == null)
+                {
+                    _logger.LogError("Transação de cancelamento não encontrada. IdempotencyKey: {IdempotencyKey}", request.IdempotencyKey);
+                    return OperationResult<TransacaoDTO>.FailureResult("Erro ao processar cancelamento", "Transação não encontrada");
+                }
 
-                    if (transacao == null)
-                    {
-                        _logger.LogError("Transação de cancelamento não encontrada. IdempotencyKey: {IdempotencyKey}", request.IdempotencyKey);
-                        return OperationResult<TransacaoDTO>.FailureResult("Erro ao processar cancelamento", "Transação não encontrada");
-                    }
+                transacao.MarcarComoProcessada();
 
-                    transacao.MarcarComoProcessada();
+                //_unitOfWork.Transacoes.Atualizar(transacao);
 
-                    _unitOfWork.Transacoes.Atualizar(transacao);
-                    await _unitOfWork.CommitAsync(cancellationToken);
-
-                    return OperationResult<TransacaoDTO>.SuccessResult(_mapper.Map<TransacaoDTO>(transacao), "Cancelamento de reserva realizado com sucesso");
-
-                }, cancellationToken);
+                return OperationResult<TransacaoDTO>.SuccessResult(_mapper.Map<TransacaoDTO>(transacao), "Cancelamento de reserva realizado com sucesso");
             }
             catch (ContaBloqueadaException ex)
             {

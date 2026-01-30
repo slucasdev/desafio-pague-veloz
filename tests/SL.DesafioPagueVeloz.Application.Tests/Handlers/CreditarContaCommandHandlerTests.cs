@@ -2,10 +2,8 @@
 using FluentAssertions;
 using Moq;
 using SL.DesafioPagueVeloz.Application.Commands;
-using SL.DesafioPagueVeloz.Application.DTOs;
 using SL.DesafioPagueVeloz.Application.Handlers;
 using SL.DesafioPagueVeloz.Application.Mappings;
-using SL.DesafioPagueVeloz.Application.Responses;
 using SL.DesafioPagueVeloz.Application.Tests.Fixtures;
 using SL.DesafioPagueVeloz.Domain.Entities;
 using SL.DesafioPagueVeloz.Domain.Interfaces.Repository;
@@ -59,17 +57,10 @@ namespace SL.DesafioPagueVeloz.Application.Tests.Handlers
                 IdempotencyKey = Guid.NewGuid()
             };
 
-            // Mock: Não há transação existente (idempotência)
             _transacaoRepositoryMock
                 .Setup(r => r.ObterPorIdempotencyKeyAsync(command.IdempotencyKey, It.IsAny<CancellationToken>()))
                 .ReturnsAsync((Transacao?)null);
 
-            // Mock: ExecuteInTransactionAsync executa a função e retorna o resultado
-            _unitOfWorkMock
-                .Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<OperationResult<TransacaoDTO>>>>(), It.IsAny<CancellationToken>()))
-                .Returns<Func<Task<OperationResult<TransacaoDTO>>>, CancellationToken>(async (func, ct) => await func());
-
-            // Mock: Retorna a conta com lock
             _contaRepositoryMock
                 .Setup(r => r.ObterComLockAsync(contaId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(conta);
@@ -81,12 +72,12 @@ namespace SL.DesafioPagueVeloz.Application.Tests.Handlers
             result.Success.Should().BeTrue();
             result.Data.Should().NotBeNull();
             result.Data!.Valor.Should().Be(500m);
+            result.Data.Tipo.Should().Be(Domain.Enums.TipoOperacao.Credito.ToString());
 
-            // Verificar que Atualizar foi chamado
-            _contaRepositoryMock.Verify(r => r.Atualizar(It.IsAny<Conta>()), Times.Once);
-
-            // Verificar que CommitAsync foi chamado (2x: conta + transação processada)
-            _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.AtLeast(1));
+            // Verificar que Atualizar foi chamado (conta + transação)
+            _contaRepositoryMock.Verify(
+                r => r.Atualizar(It.IsAny<Conta>()),
+                Times.Once);
         }
 
         [Fact]
@@ -101,17 +92,10 @@ namespace SL.DesafioPagueVeloz.Application.Tests.Handlers
                 IdempotencyKey = Guid.NewGuid()
             };
 
-            // Mock: Não há transação existente
             _transacaoRepositoryMock
                 .Setup(r => r.ObterPorIdempotencyKeyAsync(command.IdempotencyKey, It.IsAny<CancellationToken>()))
                 .ReturnsAsync((Transacao?)null);
 
-            // Mock: ExecuteInTransactionAsync executa a função
-            _unitOfWorkMock
-                .Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<OperationResult<TransacaoDTO>>>>(), It.IsAny<CancellationToken>()))
-                .Returns<Func<Task<OperationResult<TransacaoDTO>>>, CancellationToken>(async (func, ct) => await func());
-
-            // Mock: Conta não encontrada
             _contaRepositoryMock
                 .Setup(r => r.ObterComLockAsync(command.ContaId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync((Conta?)null);
@@ -124,7 +108,9 @@ namespace SL.DesafioPagueVeloz.Application.Tests.Handlers
             result.Message.Should().Contain("não encontrada");
 
             // Verificar que Atualizar NÃO foi chamado
-            _contaRepositoryMock.Verify(r => r.Atualizar(It.IsAny<Conta>()), Times.Never);
+            _contaRepositoryMock.Verify(
+                r => r.Atualizar(It.IsAny<Conta>()),
+                Times.Never);
         }
 
         [Fact]
@@ -147,7 +133,6 @@ namespace SL.DesafioPagueVeloz.Application.Tests.Handlers
                 IdempotencyKey = transacaoExistente.IdempotencyKey
             };
 
-            // Mock: Retorna transação existente (idempotência)
             _transacaoRepositoryMock
                 .Setup(r => r.ObterPorIdempotencyKeyAsync(command.IdempotencyKey, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(transacaoExistente);
@@ -162,7 +147,9 @@ namespace SL.DesafioPagueVeloz.Application.Tests.Handlers
             result.Data!.Id.Should().Be(transacaoExistente.Id);
 
             // Verificar que NÃO tentou processar novamente
-            _contaRepositoryMock.Verify(r => r.ObterComLockAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+            _contaRepositoryMock.Verify(
+                r => r.ObterComLockAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+                Times.Never);
         }
     }
 }

@@ -68,9 +68,6 @@ namespace SL.DesafioPagueVeloz.Application.Tests.Handlers
             _clienteRepositoryMock.Verify(
                 r => r.AdicionarAsync(It.IsAny<Cliente>(), It.IsAny<CancellationToken>()),
                 Times.Once);
-
-            // Verificar que CommitAsync foi chamado
-            _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]

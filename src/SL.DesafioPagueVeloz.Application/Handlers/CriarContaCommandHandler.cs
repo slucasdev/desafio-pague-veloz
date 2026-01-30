@@ -52,7 +52,6 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                 var conta = Conta.Criar(request.ClienteId, request.Numero, request.LimiteCredito);
 
                 await _unitOfWork.Contas.AdicionarAsync(conta, cancellationToken);
-                await _unitOfWork.CommitAsync(cancellationToken);
 
                 _logger.LogInformation("Conta criada com sucesso: {ContaId}", conta.Id);
 

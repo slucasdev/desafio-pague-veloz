@@ -36,7 +36,11 @@ namespace SL.DesafioPagueVeloz.Application.Behaviors
 
             try
             {
+                await _unitOfWork.BeginTransactionAsync(cancellationToken);
+
                 var response = await next();
+
+                await _unitOfWork.CommitAsync(cancellationToken);
 
                 _logger.LogInformation("Transação para {RequestName} concluída com sucesso", requestName);
 

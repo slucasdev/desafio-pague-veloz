@@ -40,104 +40,102 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                 {
                     _logger.LogInformation("Transação já processada (idempotência): {IdempotencyKey}", request.IdempotencyKey);
 
-                    // Buscar ambas as transações (débito e crédito)
-                    var result = new List<TransacaoDTO>();
+                    var resultIdempotente = new List<TransacaoDTO>();
+                    resultIdempotente.Add(_mapper.Map<TransacaoDTO>(transacaoExistente));
 
-                    // Adicionar a transação existente (débito)
-                    result.Add(_mapper.Map<TransacaoDTO>(transacaoExistente));
+                    var transacoesDestino = await _unitOfWork.Transacoes
+                        .ObterPorContaIdAsync(request.ContaDestinoId, cancellationToken);
 
-                    // Buscar transação de crédito correspondente na conta destino
-                    // Ela foi criada no mesmo momento, com o mesmo valor
-                    var transacoesDestino = await _unitOfWork.Transacoes.ObterPorContaIdAsync(request.ContaDestinoId, cancellationToken);
-                    var transacaoCredito = transacoesDestino
+                    var creditoCorrespondente = transacoesDestino
                         .Where(t => t.Tipo == Domain.Enums.TipoOperacao.Credito
                                  && t.Valor == request.Valor
-                                 && t.Descricao.Contains(request.Descricao ?? "Transferência"))
+                                 && t.CriadoEm >= transacaoExistente.CriadoEm.AddSeconds(-5)
+                                 && t.CriadoEm <= transacaoExistente.CriadoEm.AddSeconds(5))
                         .OrderByDescending(t => t.CriadoEm)
                         .FirstOrDefault();
 
-                    if (transacaoCredito != null)
+                    if (creditoCorrespondente != null)
                     {
-                        result.Add(_mapper.Map<TransacaoDTO>(transacaoCredito));
+                        resultIdempotente.Add(_mapper.Map<TransacaoDTO>(creditoCorrespondente));
                     }
 
-                    return OperationResult<List<TransacaoDTO>>.SuccessResult(result, "Transação já processada anteriormente");
+                    return OperationResult<List<TransacaoDTO>>.SuccessResult(resultIdempotente, "Transação já processada anteriormente");
                 }
 
-                return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+                var contaOrigem = await _unitOfWork.Contas.ObterComLockAsync(request.ContaOrigemId, cancellationToken);
+                var contaDestino = await _unitOfWork.Contas.ObterComLockAsync(request.ContaDestinoId, cancellationToken);
+
+                if (contaOrigem == null)
                 {
-                    var contaOrigem = await _unitOfWork.Contas.ObterComLockAsync(request.ContaOrigemId, cancellationToken);
-                    var contaDestino = await _unitOfWork.Contas.ObterComLockAsync(request.ContaDestinoId, cancellationToken);
+                    _logger.LogWarning("Conta origem não encontrada: {ContaOrigemId}", request.ContaOrigemId);
+                    return OperationResult<List<TransacaoDTO>>.FailureResult("Conta origem não encontrada", "ContaOrigemId inválido");
+                }
 
-                    if (contaOrigem == null)
-                    {
-                        _logger.LogWarning("Conta origem não encontrada: {ContaOrigemId}", request.ContaOrigemId);
-                        return OperationResult<List<TransacaoDTO>>.FailureResult("Conta origem não encontrada", "ContaOrigemId inválido");
-                    }
+                if (contaDestino == null)
+                {
+                    _logger.LogWarning("Conta destino não encontrada: {ContaDestinoId}", request.ContaDestinoId);
+                    return OperationResult<List<TransacaoDTO>>.FailureResult("Conta destino não encontrada", "ContaDestinoId inválido");
+                }
 
-                    if (contaDestino == null)
-                    {
-                        _logger.LogWarning("Conta destino não encontrada: {ContaDestinoId}", request.ContaDestinoId);
-                        return OperationResult<List<TransacaoDTO>>.FailureResult("Conta destino não encontrada", "ContaDestinoId inválido");
-                    }
+                var idempotencyKeyDebito = request.IdempotencyKey;
+                var idempotencyKeyCredito = Guid.NewGuid();
 
-                    var idempotencyKeyDebito = request.IdempotencyKey;
-                    var idempotencyKeyCredito = Guid.NewGuid();
+                contaOrigem.Debitar(request.Valor, $"Transferência para conta {contaDestino.Numero} - {request.Descricao}", idempotencyKeyDebito);
+                contaDestino.Creditar(request.Valor, $"Transferência da conta {contaOrigem.Numero} - {request.Descricao}", idempotencyKeyCredito);
 
-                    contaOrigem.Debitar(request.Valor, $"Transferência para conta {contaDestino.Numero} - {request.Descricao}", idempotencyKeyDebito);
-                    contaDestino.Creditar(request.Valor, $"Transferência da conta {contaOrigem.Numero} - {request.Descricao}", idempotencyKeyCredito);
+                _unitOfWork.Contas.Atualizar(contaOrigem);
+                _unitOfWork.Contas.Atualizar(contaDestino);
 
-                    _unitOfWork.Contas.Atualizar(contaOrigem);
-                    _unitOfWork.Contas.Atualizar(contaDestino);
-                    await _unitOfWork.CommitAsync(cancellationToken);
+                _logger.LogInformation("Transferência realizada com sucesso - Origem: {ContaOrigemId}, Destino: {ContaDestinoId}",
+                    request.ContaOrigemId, request.ContaDestinoId);
 
-                    _logger.LogInformation("Transferência realizada com sucesso - Origem: {ContaOrigemId}, Destino: {ContaDestinoId}",
-                        request.ContaOrigemId, request.ContaDestinoId);
+                var transacaoDebito = contaOrigem.Transacoes.FirstOrDefault(t => t.IdempotencyKey == idempotencyKeyDebito);
+                var transacaoCreditoNova = contaDestino.Transacoes.FirstOrDefault(t => t.IdempotencyKey == idempotencyKeyCredito);
 
-                    var transacaoDebito = contaOrigem.Transacoes
-                        .FirstOrDefault(t => t.IdempotencyKey == idempotencyKeyDebito);
+                if (transacaoDebito == null || transacaoCreditoNova == null)
+                {
+                    _logger.LogError("Transações de transferência não encontradas. DebitoKey: {DebitoKey}, CreditoKey: {CreditoKey}",
+                        idempotencyKeyDebito, idempotencyKeyCredito);
 
-                    var transacaoCredito = contaDestino.Transacoes
-                        .FirstOrDefault(t => t.IdempotencyKey == idempotencyKeyCredito);
+                    return OperationResult<List<TransacaoDTO>>.FailureResult("Erro ao processar transferência", "Transações não encontradas");
+                }
 
-                    if (transacaoDebito == null || transacaoCredito == null)
-                    {
-                        _logger.LogError("Transações de transferência não encontradas. DebitoKey: {DebitoKey}, CreditoKey: {CreditoKey}, DebitoFound: {DebitoFound}, CreditoFound: {CreditoFound}",
-                            idempotencyKeyDebito, idempotencyKeyCredito, transacaoDebito != null, transacaoCredito != null);
-                        return OperationResult<List<TransacaoDTO>>.FailureResult("Erro ao processar transferência", "Transações não encontradas");
-                    }
+                transacaoDebito.MarcarComoProcessada();
+                transacaoCreditoNova.MarcarComoProcessada();
 
-                    transacaoDebito.MarcarComoProcessada();
-                    transacaoCredito.MarcarComoProcessada();
+                //_unitOfWork.Transacoes.Atualizar(transacaoDebito);
+                //_unitOfWork.Transacoes.Atualizar(transacaoCreditoNova);
 
-                    _unitOfWork.Transacoes.Atualizar(transacaoDebito);
-                    _unitOfWork.Transacoes.Atualizar(transacaoCredito);
-                    await _unitOfWork.CommitAsync(cancellationToken);
+                var resultado = new List<TransacaoDTO>
+                {
+                    _mapper.Map<TransacaoDTO>(transacaoDebito),
+                    _mapper.Map<TransacaoDTO>(transacaoCreditoNova)
+                };
 
-                    var resultado = new List<TransacaoDTO>
-                    {
-                        _mapper.Map<TransacaoDTO>(transacaoDebito),
-                        _mapper.Map<TransacaoDTO>(transacaoCredito)
-                    };
-
-                    return OperationResult<List<TransacaoDTO>>.SuccessResult(resultado, "Transferência realizada com sucesso");
-
-                }, cancellationToken);
+                return OperationResult<List<TransacaoDTO>>.SuccessResult(
+                    resultado,
+                    "Transferência realizada com sucesso");
             }
             catch (SaldoInsuficienteException ex)
             {
                 _logger.LogWarning(ex, "Saldo insuficiente na conta origem: {ContaOrigemId}", request.ContaOrigemId);
-                return OperationResult<List<TransacaoDTO>>.FailureResult("Saldo insuficiente na conta origem", ex.Message);
+                return OperationResult<List<TransacaoDTO>>.FailureResult(
+                    "Saldo insuficiente na conta origem",
+                    ex.Message);
             }
             catch (ContaBloqueadaException ex)
             {
                 _logger.LogWarning(ex, "Uma das contas está bloqueada");
-                return OperationResult<List<TransacaoDTO>>.FailureResult("Conta bloqueada", ex.Message);
+                return OperationResult<List<TransacaoDTO>>.FailureResult(
+                    "Conta bloqueada",
+                    ex.Message);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao processar transferência");
-                return OperationResult<List<TransacaoDTO>>.FailureResult("Erro ao processar transferência", ex.Message);
+                return OperationResult<List<TransacaoDTO>>.FailureResult(
+                    "Erro ao processar transferência",
+                    ex.Message);
             }
         }
     }

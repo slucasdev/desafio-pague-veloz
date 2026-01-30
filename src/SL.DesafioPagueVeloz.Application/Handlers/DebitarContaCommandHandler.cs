@@ -42,39 +42,33 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                     return OperationResult<TransacaoDTO>.SuccessResult(_mapper.Map<TransacaoDTO>(transacaoExistente), "Transação já processada anteriormente");
                 }
 
-                return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+                var conta = await _unitOfWork.Contas.ObterComLockAsync(request.ContaId, cancellationToken);
+
+                if (conta == null)
                 {
-                    var conta = await _unitOfWork.Contas.ObterComLockAsync(request.ContaId, cancellationToken);
+                    _logger.LogWarning("Conta não encontrada: {ContaId}", request.ContaId);
+                    return OperationResult<TransacaoDTO>.FailureResult("Conta não encontrada", "ContaId inválido");
+                }
 
-                    if (conta == null)
-                    {
-                        _logger.LogWarning("Conta não encontrada: {ContaId}", request.ContaId);
-                        return OperationResult<TransacaoDTO>.FailureResult("Conta não encontrada", "ContaId inválido");
-                    }
+                conta.Debitar(request.Valor, request.Descricao, request.IdempotencyKey);
 
-                    conta.Debitar(request.Valor, request.Descricao, request.IdempotencyKey);
+                _unitOfWork.Contas.Atualizar(conta);
 
-                    _unitOfWork.Contas.Atualizar(conta);
-                    await _unitOfWork.CommitAsync(cancellationToken);
+                _logger.LogInformation("Débito realizado com sucesso na conta: {ContaId}, Novo saldo: {Saldo}", conta.Id, conta.SaldoDisponivel);
 
-                    _logger.LogInformation("Débito realizado com sucesso na conta: {ContaId}, Novo saldo: {Saldo}", conta.Id, conta.SaldoDisponivel);
+                var transacao = conta.Transacoes.FirstOrDefault(t => t.IdempotencyKey == request.IdempotencyKey);
 
-                    var transacao = conta.Transacoes.FirstOrDefault(t => t.IdempotencyKey == request.IdempotencyKey);
+                if (transacao == null)
+                {
+                    _logger.LogError("Transação de débito não encontrada. IdempotencyKey: {IdempotencyKey}", request.IdempotencyKey);
+                    return OperationResult<TransacaoDTO>.FailureResult("Erro ao processar débito", "Transação não encontrada");
+                }
 
-                    if (transacao == null)
-                    {
-                        _logger.LogError("Transação de débito não encontrada. IdempotencyKey: {IdempotencyKey}", request.IdempotencyKey);
-                        return OperationResult<TransacaoDTO>.FailureResult("Erro ao processar débito", "Transação não encontrada");
-                    }
+                transacao.MarcarComoProcessada();
 
-                    transacao.MarcarComoProcessada();
+                //_unitOfWork.Transacoes.Atualizar(transacao);
 
-                    _unitOfWork.Transacoes.Atualizar(transacao);
-                    await _unitOfWork.CommitAsync(cancellationToken);
-
-                    return OperationResult<TransacaoDTO>.SuccessResult(_mapper.Map<TransacaoDTO>(transacao), "Débito realizado com sucesso");
-
-                }, cancellationToken);
+                return OperationResult<TransacaoDTO>.SuccessResult(_mapper.Map<TransacaoDTO>(transacao), "Débito realizado com sucesso");
             }
             catch (SaldoInsuficienteException ex)
             {

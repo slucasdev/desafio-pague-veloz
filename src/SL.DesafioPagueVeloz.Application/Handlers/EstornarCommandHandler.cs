@@ -50,43 +50,37 @@ namespace SL.DesafioPagueVeloz.Application.Handlers
                     return OperationResult<TransacaoDTO>.FailureResult("Transação original não encontrada", "TransacaoOriginalId inválido");
                 }
 
-                return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+                var conta = await _unitOfWork.Contas.ObterComLockAsync(request.ContaId, cancellationToken);
+
+                if (conta == null)
                 {
-                    var conta = await _unitOfWork.Contas.ObterComLockAsync(request.ContaId, cancellationToken);
+                    _logger.LogWarning("Conta não encontrada: {ContaId}", request.ContaId);
+                    return OperationResult<TransacaoDTO>.FailureResult("Conta não encontrada", "ContaId inválido");
+                }
 
-                    if (conta == null)
-                    {
-                        _logger.LogWarning("Conta não encontrada: {ContaId}", request.ContaId);
-                        return OperationResult<TransacaoDTO>.FailureResult("Conta não encontrada", "ContaId inválido");
-                    }
+                conta.Estornar(request.Valor, request.TransacaoOriginalId, request.Descricao, request.IdempotencyKey);
 
-                    conta.Estornar(request.Valor, request.TransacaoOriginalId, request.Descricao, request.IdempotencyKey);
+                transacaoOriginal.MarcarComoEstornada();
+                //_unitOfWork.Transacoes.Atualizar(transacaoOriginal);
 
-                    transacaoOriginal.MarcarComoEstornada();
-                    _unitOfWork.Transacoes.Atualizar(transacaoOriginal);
+                _unitOfWork.Contas.Atualizar(conta);
 
-                    _unitOfWork.Contas.Atualizar(conta);
-                    await _unitOfWork.CommitAsync(cancellationToken);
+                _logger.LogInformation("Estorno realizado com sucesso na conta: {ContaId}, Novo saldo: {SaldoDisponivel}",
+                    conta.Id, conta.SaldoDisponivel);
 
-                    _logger.LogInformation("Estorno realizado com sucesso na conta: {ContaId}, Novo saldo: {SaldoDisponivel}",
-                        conta.Id, conta.SaldoDisponivel);
+                var transacaoEstorno = conta.Transacoes.FirstOrDefault(t => t.IdempotencyKey == request.IdempotencyKey);
 
-                    var transacaoEstorno = conta.Transacoes.FirstOrDefault(t => t.IdempotencyKey == request.IdempotencyKey);
+                if (transacaoEstorno == null)
+                {
+                    _logger.LogError("Transação de estorno não encontrada após criação. IdempotencyKey: {IdempotencyKey}", request.IdempotencyKey);
+                    return OperationResult<TransacaoDTO>.FailureResult("Erro ao processar estorno", "Transação de estorno não encontrada");
+                }
 
-                    if (transacaoEstorno == null)
-                    {
-                        _logger.LogError("Transação de estorno não encontrada após criação. IdempotencyKey: {IdempotencyKey}", request.IdempotencyKey);
-                        return OperationResult<TransacaoDTO>.FailureResult("Erro ao processar estorno", "Transação de estorno não encontrada");
-                    }
+                transacaoEstorno.MarcarComoProcessada();
 
-                    transacaoEstorno.MarcarComoProcessada();
+                //_unitOfWork.Transacoes.Atualizar(transacaoEstorno);
 
-                    _unitOfWork.Transacoes.Atualizar(transacaoEstorno);
-                    await _unitOfWork.CommitAsync(cancellationToken);
-
-                    return OperationResult<TransacaoDTO>.SuccessResult(_mapper.Map<TransacaoDTO>(transacaoEstorno), "Estorno realizado com sucesso");
-
-                }, cancellationToken);
+                return OperationResult<TransacaoDTO>.SuccessResult(_mapper.Map<TransacaoDTO>(transacaoEstorno), "Estorno realizado com sucesso");
             }
             catch (ContaBloqueadaException ex)
             {
