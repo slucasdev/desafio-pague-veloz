@@ -91,7 +91,7 @@ A aplicação segue os princípios de **Clean Architecture** com separação cla
 - **FluentAssertions** (6.12.2) - Assertions expressivas
 - **WebApplicationFactory** - Testes de integração end-to-end
 - **SQLite In-Memory** - Banco de dados para testes
-- **Bogus** - Geração de dados de teste
+<!-- - **Bogus** - Geração de dados de teste -->
 
 ### **Infrastructure:**
 - **Docker** - Containerização
