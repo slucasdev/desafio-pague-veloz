@@ -29,6 +29,8 @@ namespace SL.DesafioPagueVeloz.Domain.Entities
             if (string.IsNullOrWhiteSpace(nome))
                 throw new ArgumentException("Nome é obrigatório", nameof(nome));
 
+            // TODO: @slucasdev - Implementar validações mais robustas para o email, seguinte padrão de mercado
+            // Ex: esta comentado o metodo: IsEmailValido
             if (string.IsNullOrWhiteSpace(email))
                 throw new ArgumentException("Email é obrigatório", nameof(email));
 
@@ -63,5 +65,18 @@ namespace SL.DesafioPagueVeloz.Domain.Entities
             Ativo = true;
             AtualizarTimestamp();
         }
+
+        //private static bool IsEmailValido(string email)
+        //{
+        //    try
+        //    {
+        //        var addr = new System.Net.Mail.MailAddress(email);
+        //        return addr.Address == email;
+        //    }
+        //    catch
+        //    {
+        //        return false;
+        //    }
+        //}
     }
 }

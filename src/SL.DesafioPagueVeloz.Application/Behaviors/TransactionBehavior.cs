@@ -34,33 +34,22 @@ namespace SL.DesafioPagueVeloz.Application.Behaviors
 
             _logger.LogInformation("Iniciando transação para {RequestName}", requestName);
 
-            try
+            return await _unitOfWork.ExecuteInTransactionWithRetryAsync(async () =>
             {
-                await _unitOfWork.BeginTransactionAsync(cancellationToken);
-
-                var response = await next();
-
-                await _unitOfWork.CommitAsync(cancellationToken);
-
-                _logger.LogInformation("Transação para {RequestName} concluída com sucesso", requestName);
-
-                return response;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erro durante transação de {RequestName}, executando rollback", requestName);
-
                 try
                 {
-                    await _unitOfWork.RollbackAsync(cancellationToken);
-                }
-                catch (Exception rollbackEx)
-                {
-                    _logger.LogError(rollbackEx, "Erro ao executar rollback para {RequestName}", requestName);
-                }
+                    var response = await next();
 
-                throw;
-            }
+                    _logger.LogInformation("Transação para {RequestName} concluída com sucesso", requestName);
+
+                    return response;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Erro durante transação de {RequestName}", requestName);
+                    throw;
+                }
+            }, cancellationToken);
         }
     }
 }
